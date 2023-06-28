@@ -3,21 +3,47 @@ import time
 import random
 import os
 
-WORLD_WIDTH = 40
-MAX_WORLD_X = WORLD_WIDTH - 1
-MIDDLE_X = MAX_WORLD_X // 2
-WORLD_HEIGHT = 15
-MAX_WORLD_Y = WORLD_HEIGHT - 1
-MIDDLE_Y = MAX_WORLD_Y // 2
-TREES_RATIO = 5
-WOOD_PER_TREE = 15
-CHUNKS_PER_ROCK = 10
-HEARTBEAT3 = 0.1
-HEARTBEAT2 = 0.25
-HEARTBEAT1 = 3
-ALLOWED_TO_STEP_ON = ['☼', '♥', '.', 'B']
-LIST_OF_ALLOWED_BUILDINGS = ['b', 'w', 'bed', 'wall']
-KEYS_USED = ['Left', 'Right', 'Up', 'Down', 'Return', 'm', 'c', 'b', 'g', '1', '2', '3', 'q', 'e', 'd', 'w', 'a', 'l']
+
+def clear_console():
+    # for command line
+    os.system('cls' if os.name == 'nt' else 'clear')
+    # for CIP IDE
+    # for i in range(25):
+    #     print()
+
+
+def greeting_screen(world, key_event_canvas):
+    print("Karel Fortress".center(2 * world.world_width))
+    print("This is dwarf: A".center(2 * world.world_width))
+    print("It ain't much but has an honest hat.".center(2 * world.world_width))
+    print()
+    print("It is Dwarf Fortress like game, you are controlling a cursor ☼. You can point at a tree to order dwarf to"
+          " chop it for wood, point at rock in order for it to be mined."
+          " You can build things on the ground represented by dots")
+    print()
+    print()
+    print("Dwarf goes to heart representing food when it's hungry(fullness below 50)"
+          " and goes to bed at 22 and wakes up at 6")
+    print()
+    print()
+    print()
+    print("Arrows control a cursor ☼, it starts at top left corner.".center(2 * world.world_width))
+    print()
+    print("By pointing the cursor somewhere and pressing key you can order a dwarf to:")
+    print()
+    print(" c - chop tree ♠".center(2 * world.world_width))
+    print("m - mine rock ■".center(2 * world.world_width))
+    print("b - build wooden wall ░ or bed B".center(2 * world.world_width))
+    print("g - go for a walk".center(2 * world.world_width))
+    print("Additionally r - rescue(terminates current task), 1/2/3 - game speed".center(2 * world.world_width))
+    print()
+    print()
+    print("press enter to continue")
+    key = ''
+    while key != 'enter':
+        key_event_canvas.update()
+        key = key_event_canvas.stored_key
+        key_event_canvas.reset_stored_key()
 
 
 class KeyEventCanvas:
@@ -43,9 +69,6 @@ class KeyEventCanvas:
 
 
 def process_key(key_event_canvas, key):
-    # if key is not KEYS_USED:
-    #     key = ''
-    # it may come in handy later in some shape or form
     if key == 'Left':
         key = 'left'
     elif key == 'Right':
@@ -59,72 +82,73 @@ def process_key(key_event_canvas, key):
     key_event_canvas.stored_key = key
 
 
-def clear_console():
-    # for windows cmd
-    os.system('cls' if os.name == 'nt' else 'clear')
-    # for CIP IDE
-    # for i in range(25):
-    #     print()
+class World(object):
+    speed_modes = [0, 1, 0.25, 0.1]
+    speed_modes_names = ['placeholder', 'slow', 'normal', 'fast']
+    allowed_to_step_on = ['☼', '♥', '.', 'B']
+    list_of_allowed_buildings = ['b', 'w', 'bed', 'wall']
 
+    def __init__(self, name):
+        self.name = name
+        self.world_width = 40
+        self.max_world_x = self.world_width - 1
+        self.middle_x = self.max_world_x // 2
+        self.world_height = 15
+        self.max_world_y = self.world_height - 1
+        self.middle_y = self.max_world_y // 2
+        self.is_it_night_or_day = 'day'
+        self.time_of_the_day = 12.0
+        self.speed = self.speed_modes[2]
+        self.speed_name = self.speed_modes_names[2]
 
-def greeting_screen(key_event_canvas):
-    print("Karel Fortress")
-    print("This is dwarf: A")
-    print("It ain't much but has an honest hat.")
-    print()
-    print("It is Dwarf Fortress like game, you are controlling a cursor ☼. You can point at a tree to order dwarf to"
-          " chop it for wood, point at rock in order for it to be mined."
-          " You can build things on the ground represented by dots")
-    print("Dwarf goes to heart representing food when it's hungry(fullness below 50)"
-          " and goes to bed at 22 and wakes up at 6")
-    print()
-    print("Arrows control a cursor ☼, it starts at top left corner.")
-    print("By pointing the cursor somewhere and pressing certain key you can order a dwarf to")
-    print(" c - chop tree ♠, m - mine rock ■, b - build wooden wall ░ or bed B, g - just go for a walk")
-    print("Additionally r - rescue(if dwarf is stuck), 1/2/3 - game speed")
-    print("press enter to continue")
-    key = ''
-    while key != 'enter':
-        key_event_canvas.update()
-        key = key_event_canvas.stored_key
-        key_event_canvas.reset_stored_key()
+    def world_tick(self):
+        self.time_of_the_day += 0.025
+        if self.time_of_the_day >= 24:
+            self.time_of_the_day = 0
+        if self.time_of_the_day >= 22 or self.time_of_the_day < 6:
+            self.is_it_night_or_day = 'night'
+        else:
+            self.is_it_night_or_day = 'day'
 
 
 class Grid(object):
     empty = '.'
     rock = '■'
     tree = '♠'
+    trees_ratio = 5
+    wood_per_tree = 15
+    chunks_per_rock = 10
 
-    def __init__(self, name, height, width):
+    def __init__(self, world, name):
         self.name = name
-        self.height = height
-        self.width = width
-        self.grid = [[Grid.empty for _ in range(width)] for _ in range(height)]
-        self.total_size = height * width
+        self.height = world.world_height
+        self.width = world.world_width
+        self.grid = [[Grid.empty for _ in range(self.width)] for _ in range(self.height)]
+        self.total_size = self.height * self.width
+        self.middle_y = world.middle_y
+        self.middle_x = world.middle_x
         self.num_rocks = 0
         self.num_trees = 0
         self.num_dwarfs = 0
         # default sleeping spot
         self.bed_y, self.bed_x = self.find_empty_cell_around()
-        self.is_it_night_or_day = 'day'
-        self.time_of_the_day = 12.0
 
-    def generate_mountain(self):
-        initial_y = int(MAX_WORLD_Y / 2)
+    def generate_mountain(self, world):
+        initial_y = int(world.max_world_y / 2)
         y = initial_y
         next_direction_change = False
         direction_decisions = (True, False)
         direction_change_cooldown = 4
-        for x in range(int(MAX_WORLD_Y) + int(MAX_WORLD_X)):
-            if y <= MAX_WORLD_Y and x <= MAX_WORLD_X and not next_direction_change:
+        for x in range(int(world.max_world_y) + int(world.max_world_x)):
+            if y <= world.max_world_y and x <= world.max_world_x and not next_direction_change:
                 self.grid[y][x] = self.rock
                 self.num_rocks += 1
-                self.fill_with_rocks_to_south_edge(y, x)
-            elif y < MAX_WORLD_Y and x <= MAX_WORLD_X:
+                self.fill_with_rocks_to_south_edge(world, y, x)
+            elif y < world.max_world_y and x <= world.max_world_x:
                 y += 1
                 self.grid[y][x] = self.rock
                 self.num_rocks += 1
-                self.fill_with_rocks_to_south_edge(y, x)
+                self.fill_with_rocks_to_south_edge(world, y, x)
                 next_direction_change = False
             else:
                 return
@@ -134,20 +158,20 @@ class Grid(object):
             else:
                 direction_change_cooldown -= 1
 
-    def fill_with_rocks_to_south_edge(self, y, x):
+    def fill_with_rocks_to_south_edge(self, world, y, x):
         y += 1
-        while y <= MAX_WORLD_Y:
+        while y <= world.max_world_y:
             self.grid[y][x] = self.rock
             self.num_rocks += 1
             y += 1
 
-    def generate_trees(self):
+    def generate_trees(self, world):
         # trees must be integer like in a real world
-        num_trees = (self.total_size - self.num_rocks) // TREES_RATIO
+        num_trees = (self.total_size - self.num_rocks) // self.trees_ratio
         for i in range(num_trees):
             while True:
-                y = random.randint(0, MAX_WORLD_Y)
-                x = random.randint(0, MAX_WORLD_X)
+                y = random.randint(0, world.max_world_y)
+                x = random.randint(0, world.max_world_x)
                 if self.grid[y][x] == self.empty:
                     self.grid[y][x] = self.tree
                     self.num_trees += 1
@@ -166,7 +190,10 @@ class Grid(object):
                     print(cell, end=" ")
             print()
 
-    def find_empty_cell_around(self, y=MIDDLE_Y, x=MIDDLE_X):
+    def find_empty_cell_around(self, y=None, x=None):
+        if y is None or x is None:
+            y = self.middle_y
+            x = self.middle_x
         direction = 1
         while True:
             if self.grid[y][x] == '.':
@@ -212,22 +239,29 @@ class Dwarf(object):
         self.hp = 30
         self.hunger = 100
         self.eq = {'wood': 0, 'rock_chunks': 0, 'food': 0}
+        location.num_dwarfs += 1
 
-    def dwarf_action(self, location, food, cursor, key_event_canvas):
-        self.dwarf_move(location, cursor)
+    def dwarf_action(self, world, location, food, cursor, key_event_canvas):
+        self.dwarf_move(world, location, cursor)
         # (cursor.goal is not None) perhaps will need later
         if (cursor.goal in ['go', 'sleep'] and (self.y_coord == cursor.goal_y_coord and
                                                 self.x_coord == cursor.goal_x_coord)) or \
                 (cursor.goal in ['chop', 'mine', 'build', 'eat'] and
                  [self.y_coord, self.x_coord] in cursor.goal_neighbourhood.values()):
+            # refresh screen after moving to the target and before taking action
+            clear_console()
+            location.display_grid(self, food, cursor)
+            hud(world, location, self, food, cursor)
+            time.sleep(world.speed)
+            world.world_tick()
             if cursor.goal == 'chop':
                 time.sleep(0.5)
                 location.grid[cursor.goal_y_coord][cursor.goal_x_coord] = location.empty
-                self.eq['wood'] += WOOD_PER_TREE
+                self.eq['wood'] += location.wood_per_tree
             if cursor.goal == 'mine':
                 time.sleep(0.5)
                 location.grid[cursor.goal_y_coord][cursor.goal_x_coord] = location.empty
-                self.eq['rock_chunks'] += CHUNKS_PER_ROCK
+                self.eq['rock_chunks'] += location.chunks_per_rock
             if cursor.goal == 'build':
                 if self.eq['wood'] < 5:
                     print("Not enough wood, chop some by pointing at a tree ♠ and pressing 'c'")
@@ -248,9 +282,12 @@ class Dwarf(object):
                             key_event_canvas.reset_stored_key()
                             if key != 'enter' and key is not None:
                                 input_building += str(key)
+                                print(input_building)
                         input_building = input_building.lower()
-                        if input_building in LIST_OF_ALLOWED_BUILDINGS:
+                        if input_building in world.list_of_allowed_buildings:
                             break
+                        key = ''
+                        input_building = ''
                         print("Please enter a correct command")
                         print("What would you like to build?(options are: bed, wall)")
                     if input_building in ['w', 'wall']:
@@ -265,7 +302,7 @@ class Dwarf(object):
                 self.hunger = 100
             cursor.goal = None
 
-    def dwarf_move(self, location, cursor):
+    def dwarf_move(self, world, location, cursor):
         self.previous_y_coord = self.y_coord
         self.previous_x_coord = self.x_coord
         if (cursor.goal in ['go', 'sleep'] and (self.y_coord != cursor.goal_y_coord or
@@ -273,67 +310,67 @@ class Dwarf(object):
                 (cursor.goal in ['chop', 'mine', 'build', 'eat'] and
                  [self.y_coord, self.x_coord] not in cursor.goal_neighbourhood.values()):
             if self.y_coord < cursor.goal_y_coord and \
-                    location.grid[self.y_coord + 1][self.x_coord] in ALLOWED_TO_STEP_ON and \
-                    self.y_coord + 1 != MAX_WORLD_Y:
+                    location.grid[self.y_coord + 1][self.x_coord] in world.allowed_to_step_on and \
+                    self.y_coord + 1 != world.max_world_y:
                 self.y_coord += 1
             elif self.y_coord > cursor.goal_y_coord and \
-                    location.grid[self.y_coord - 1][self.x_coord] in ALLOWED_TO_STEP_ON and \
+                    location.grid[self.y_coord - 1][self.x_coord] in world.allowed_to_step_on and \
                     self.y_coord - 1 != -1:
                 self.y_coord -= 1
             elif self.x_coord < cursor.goal_x_coord and \
-                    location.grid[self.y_coord][self.x_coord + 1] in ALLOWED_TO_STEP_ON and \
-                    self.x_coord + 1 != WORLD_WIDTH:
+                    location.grid[self.y_coord][self.x_coord + 1] in world.allowed_to_step_on and \
+                    self.x_coord + 1 != world.world_width:
                 self.x_coord += 1
             elif self.x_coord > cursor.goal_x_coord and \
-                    location.grid[self.y_coord][self.x_coord - 1] in ALLOWED_TO_STEP_ON and \
+                    location.grid[self.y_coord][self.x_coord - 1] in world.allowed_to_step_on and \
                     self.x_coord - 1 != -1:
                 self.x_coord -= 1
             while self.previous_y_coord == self.y_coord and self.previous_x_coord == self.x_coord:
                 if self.y_coord == cursor.goal_y_coord:
                     # smart: when on the same y as goal, I want to implement it also for the same x as goal
                     if self.x_coord > cursor.goal_x_coord:
-                        if self.y_coord + 1 != WORLD_HEIGHT and self.x_coord - 1 != -1 and \
-                                location.grid[self.y_coord + 1][self.x_coord - 1] in ALLOWED_TO_STEP_ON:
+                        if self.y_coord + 1 != world.world_width and self.x_coord - 1 != -1 and \
+                                location.grid[self.y_coord + 1][self.x_coord - 1] in world.allowed_to_step_on:
                             self.y_coord += 1
                             self.x_coord -= 1
                         elif self.y_coord - 1 != -1 and self.x_coord - 1 != -1 and \
-                                location.grid[self.y_coord - 1][self.x_coord - 1] in ALLOWED_TO_STEP_ON:
+                                location.grid[self.y_coord - 1][self.x_coord - 1] in world.allowed_to_step_on:
                             self.y_coord -= 1
                             self.x_coord -= 1
                     if self.x_coord < cursor.goal_x_coord:
-                        if self.y_coord + 1 != WORLD_HEIGHT and self.x_coord + 1 != WORLD_WIDTH and \
-                                location.grid[self.y_coord + 1][self.x_coord + 1] in ALLOWED_TO_STEP_ON:
+                        if self.y_coord + 1 != world.world_width and self.x_coord + 1 != world.world_width and \
+                                location.grid[self.y_coord + 1][self.x_coord + 1] in world.allowed_to_step_on:
                             self.y_coord += 1
                             self.x_coord += 1
-                        elif self.y_coord - 1 != -1 and self.x_coord + 1 != WORLD_WIDTH and \
-                                location.grid[self.y_coord - 1][self.x_coord + 1] in ALLOWED_TO_STEP_ON:
+                        elif self.y_coord - 1 != -1 and self.x_coord + 1 != world.world_width and \
+                                location.grid[self.y_coord - 1][self.x_coord + 1] in world.allowed_to_step_on:
                             self.y_coord -= 1
                             self.x_coord += 1
                 if self.previous_y_coord == self.y_coord and self.previous_x_coord == self.x_coord:
                     for i in range(3):
                         direction = random.randint(1, 4)
-                        if direction == 1 and self.y_coord + 1 != WORLD_HEIGHT \
-                                and location.grid[self.y_coord + 1][self.x_coord] in ALLOWED_TO_STEP_ON:
+                        if direction == 1 and self.y_coord + 1 != world.world_width \
+                                and location.grid[self.y_coord + 1][self.x_coord] in world.allowed_to_step_on:
                             self.y_coord += 1
                         elif direction == 2 and self.y_coord - 1 != -1 \
-                                and location.grid[self.y_coord - 1][self.x_coord] in ALLOWED_TO_STEP_ON:
+                                and location.grid[self.y_coord - 1][self.x_coord] in world.allowed_to_step_on:
                             self.y_coord -= 1
-                        elif direction == 3 and self.x_coord + 1 != WORLD_WIDTH \
-                                and location.grid[self.y_coord][self.x_coord + 1] in ALLOWED_TO_STEP_ON:
+                        elif direction == 3 and self.x_coord + 1 != world.world_width \
+                                and location.grid[self.y_coord][self.x_coord + 1] in world.allowed_to_step_on:
                             self.x_coord += 1
                         elif direction == 4 and self.x_coord - 1 != - 1 \
-                                and location.grid[self.y_coord][self.x_coord - 1] in ALLOWED_TO_STEP_ON:
+                                and location.grid[self.y_coord][self.x_coord - 1] in world.allowed_to_step_on:
                             self.x_coord -= 1
 
-    def status(self, location, cursor, food):
+    def status(self, world, location, cursor, food):
         self.hunger -= 0.1
         if self.hunger < 50:
-            cursor.create_goal(location, 'hungry', food)
+            cursor.create_goal(world, location, 'hungry', food)
         if self.hunger < 0:
             self.hp -= 1
-        if cursor.goal is None and location.is_it_night_or_day == 'night' and (self.y_coord != location.bed_y or
-                                                                               self.x_coord != location.bed_x):
-            cursor.create_goal(location, 'sleepy')
+        if cursor.goal is None and world.is_it_night_or_day == 'night' and (self.y_coord != location.bed_y or
+                                                                            self.x_coord != location.bed_x):
+            cursor.create_goal(world, location, 'sleepy')
 
 
 class Food(object):
@@ -345,10 +382,10 @@ class Food(object):
         else:
             self.y_coord, self.x_coord = location.find_empty_cell_around(dwarf.y_coord + 1, dwarf.x_coord + 1)
         self.amount = 500
-        self.neighbourhood = {1: [self.y_coord - 1, self.x_coord], 2: [self.y_coord - 1, self.x_coord + 1],
-                              3: [self.y_coord, self.x_coord + 1], 4: [self.y_coord + 1, self.x_coord + 1],
-                              5: [self.y_coord + 1, self.x_coord], 6: [self.y_coord + 1, self.x_coord - 1],
-                              7: [self.y_coord, self.x_coord - 1], 8: [self.y_coord - 1, self.x_coord - 1]}
+        self.neighbourhood = {1: [self.y_coord - 1, self.x_coord],
+                              2: [self.y_coord, self.x_coord + 1],
+                              3: [self.y_coord + 1, self.x_coord],
+                              4: [self.y_coord, self.x_coord - 1]}
 
 
 class Cursor(object):
@@ -364,27 +401,23 @@ class Cursor(object):
         self.goal_x_coord = None
         self.goal_neighbourhood = {}
 
-    def move_cursor(self, location, key=''):
+    def move_cursor(self, world, location, key=''):
         if key == 'up' and self.y_coord > 0:
             self.y_coord -= 1
         elif key == 'left' and self.x_coord > 0:
             self.x_coord -= 1
-        elif key == 'right' and self.x_coord < MAX_WORLD_X:
+        elif key == 'right' and self.x_coord < world.max_world_x:
             self.x_coord += 1
-        elif key == 'down' and self.y_coord < MAX_WORLD_Y:
+        elif key == 'down' and self.y_coord < world.max_world_y:
             self.y_coord += 1
         self.target = location.grid[self.y_coord][self.x_coord]
 
-    def create_goal(self, location, key, food=None):
-        self.neighbourhood[1] = [self.y_coord - 1, self.x_coord]
-        self.neighbourhood[2] = [self.y_coord - 1, self.x_coord + 1]
-        self.neighbourhood[3] = [self.y_coord, self.x_coord + 1]
-        self.neighbourhood[4] = [self.y_coord + 1, self.x_coord + 1]
-        self.neighbourhood[5] = [self.y_coord + 1, self.x_coord]
-        self.neighbourhood[6] = [self.y_coord + 1, self.x_coord - 1]
-        self.neighbourhood[7] = [self.y_coord, self.x_coord - 1]
-        self.neighbourhood[8] = [self.y_coord - 1, self.x_coord - 1]
-        if location.is_it_night_or_day == 'day':
+    def create_goal(self, world, location, key, food=None):
+        self.neighbourhood = {1: [self.y_coord - 1, self.x_coord],
+                              2: [self.y_coord, self.x_coord + 1],
+                              3: [self.y_coord + 1, self.x_coord],
+                              4: [self.y_coord, self.x_coord - 1]}
+        if world.is_it_night_or_day == 'day':
             if key == 'm' and self.target == '■':
                 self.goal = 'mine'
                 self.goal_y_coord = self.y_coord
@@ -415,104 +448,74 @@ class Cursor(object):
             self.goal_x_coord = location.bed_x
 
 
-def main():
-    key_event_canvas = KeyEventCanvas(process_key)
-    clear_console()
-    # greeting_screen(key_event_canvas)
-    clear_console()
-    # load world
-    home = Grid('home', WORLD_HEIGHT, WORLD_WIDTH)
-    home.generate_mountain()
-    home.generate_trees()
-    # load creatures
-    dwarf = Dwarf(home, 'Lee')
-    # load items
-    food = Food(home, dwarf)
+def hud(world, location, dwarf, food, cursor):
+    print()
+    print("time:", int(world.time_of_the_day),
+          "it is", world.is_it_night_or_day,
+          "| HP:", dwarf.hp,
+          "| stomach fullness:", int(dwarf.hunger),
+          "| game speed:", world.speed_name)
+    # EQ bar
+    print("Equipment:", "wood:", dwarf.eq['wood'],
+          "| rock chunks:", dwarf.eq['rock_chunks'],
+          "| food:", dwarf.eq['food'])
+    # controls
+    print("arrows - move cursor, c - chop tree ♠, m - mine rock ■, b - build wooden wall ░ or bed B,"
+          " g - go fo a walk, r - rescue(stop current task), q - quit")
+    # logic for displaying info about current position od cursor
+    if cursor.target == '♠':
+        print("Currently pointing at: green ♠")
+    if cursor.target == '■':
+        print("Currently pointing at: rocky ■")
+    if cursor.target == '░':
+        print("Currently pointing at: wooden ░")
+    if [cursor.y_coord, cursor.x_coord] == [dwarf.y_coord, dwarf.x_coord]:
+        print("Currently pointing at: nice dwarf A")
+    if [cursor.y_coord, cursor.x_coord] == [food.y_coord, food.x_coord]:
+        print("Currently pointing at: food in quantity: " + str(food.amount))
+    print()
 
+
+def main():
+    # assuming future option for multiple locations it is one "world" class to bond them all
+    world = World('home-world')
+    # keyboard input capturing class, hated to leave it be in peace partially useless,
+    # so beware, it may have some wired shit inside
+    key_event_canvas = KeyEventCanvas(process_key)
+    greeting_screen(world, key_event_canvas)
+    # create world
+    home = Grid(world, 'home')
+    home.generate_mountain(world)
+    home.generate_trees(world)
+    # create creatures
+    dwarf = Dwarf(home, 'Lee')
+    # create items
+    food = Food(home, dwarf)
+    # create other stuff
     cursor = Cursor(home)
-    print("loading...")  # can be useful for testing
-    if home and dwarf and food and cursor:
-        print('OK')
-    else:
-        print('OOPS')
-        time.sleep(2)
-        return
-    # print("Zoom out (Ctrl + -) so page doesn't scroll when using arrows")
-    # print()
-    # time.sleep(1)
-    # print("Build bed before night!")
-    # print()
-    # time.sleep(1)
-    # print("press enter")
-    # key = ''
-    # while key != 'enter':
-    #     key_event_canvas.update()
-    #     key = key_event_canvas.stored_key
-    #     key_event_canvas.reset_stored_key()
-    speed = HEARTBEAT3
-    what_speed = 'fast'
     clear_console()
-    home.display_grid(dwarf, food, cursor)
-    time.sleep(speed)
     while True:
-        if home.time_of_the_day >= 24:
-            home.time_of_the_day = 0
         key_event_canvas.update()
         key = key_event_canvas.stored_key
         key_event_canvas.reset_stored_key()
-        if key == '1':
-            speed = HEARTBEAT1  # slow
-            what_speed = 'slow'
-        elif key == '2':
-            speed = HEARTBEAT2  # normal
-            what_speed = 'normal'
-        elif key == '3':
-            # noinspection SpellCheckingInspection
-            speed = HEARTBEAT3  # fast boiiii
-            what_speed = 'fast'
+        if key in ['1', '2', '3']:
+            world.speed = world.speed_modes[int(key)]
+            world.speed_name = world.speed_modes_names[int(key)]
         elif key == 'q':
-            # noinspection SpellCheckingInspection
-            break  # like urwał mi od internetu
-        cursor.move_cursor(home, key)
-        dwarf.status(home, cursor, food)
-        if cursor.goal is None and key in ['c', 'm', 'g', 'b', 'r']:
-            cursor.create_goal(home, key, food)
+            break
+        cursor.move_cursor(world, home, key)
+        dwarf.status(world, home, cursor, food)
+        if cursor.goal is None and key in ['c', 'm', 'g', 'b']:
+            cursor.create_goal(world, home, key, food)
+        if key == 'r':
+            cursor.goal = None
         if cursor.goal is not None:
-            dwarf.dwarf_action(home, food, cursor, key_event_canvas)
+            dwarf.dwarf_action(world, home, food, cursor, key_event_canvas)
         clear_console()
         home.display_grid(dwarf, food, cursor)
-        # Debugging time!
-        # Which will actually use log or sth in future
-        # print('dwarf', dwarf, 'cursor', cursor, 'goal', goal)
-        # vitals bar
-        print()
-        print("time:", int(home.time_of_the_day), "it is", home.is_it_night_or_day, "| HP:", dwarf.hp,
-              "| stomach fullness:", int(dwarf.hunger), "| game speed:", what_speed)
-        # EQ bar
-        print("Equipment:", "wood:", dwarf.eq['wood'],
-              "| rock chunks:", dwarf.eq['rock_chunks'],
-              "| food:", dwarf.eq['food'])
-        # controls
-        print("arrows - move cursor, c - chop tree ♠, m - mine rock ■, b - build wooden wall ░ or bed B,"
-              " g - go fo a walk, r - rescue if stuck, q - quit")
-        # logic for displaying info about current position od cursor
-        if cursor.target == '♠':
-            print("Currently pointing at: green ♠")
-        if cursor.target == 'A':
-            print("Currently pointing at: nice dwarf A")
-        if cursor.target == '■':
-            print("Currently pointing at: rocky ■")
-        if cursor.target == '░':
-            print("Currently pointing at: wooden ░")
-        # if cursor['original_tenant'] == '♥':
-        #     print("Currently pointing at:""food in quantity: " + str(food[2])
-        print()
-        time.sleep(speed)
-        home.time_of_the_day += 0.025
-        if home.time_of_the_day >= 22 or home.time_of_the_day < 6:
-            home.is_it_night_or_day = 'night'
-        else:
-            home.is_it_night_or_day = 'day'
+        hud(world, home, dwarf, food, cursor)
+        time.sleep(world.speed)
+        world.world_tick()
 
 
 if __name__ == '__main__':
